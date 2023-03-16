@@ -12,6 +12,8 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Prometheus;
+using Serilog.Sinks.Grafana.Loki;
+using Serilog.Sinks.Loki;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +42,12 @@ builder.Host.UseSerilog((context, loggerConfig) =>
 {
     loggerConfig.WriteTo.Console()
     .Enrich.WithExceptionDetails()
-    .WriteTo.Seq(builder.Configuration["SeqServer"] ?? throw new ApplicationException("Unable to locate key SeqServer in configuration"));
+    .Enrich.WithProperty("Application", context.HostingEnvironment.ApplicationName)
+    .WriteTo.Seq(builder.Configuration["SeqServer"] ?? throw new ApplicationException("Unable to locate key SeqServer in configuration"))
+    .WriteTo.LokiHttp(() =>
+    {
+        return new LokiSinkConfiguration() { LokiUrl = "http://loki:3100" };
+    });
 });
 
 builder.Services.AddProblemDetails(opts =>
@@ -95,6 +102,7 @@ app.Use((context, next) => {
     counter.WithLabels(context.Request.Method, context.Request.Path).Inc();
     return next();
 });
+
 // Use the Prometheus middleware
 app.UseMetricServer();
 app.UseHttpMetrics();

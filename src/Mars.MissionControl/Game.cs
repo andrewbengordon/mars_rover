@@ -286,7 +286,6 @@ public class Game : IDisposable
             if (hasVisitedAllTargets(player))
             {
                 logger.LogInformation("Player {playerName} has won!", player.Name);
-                metricHelper.WinnerCounter.Inc(1, Exemplar.From(MetricHelper.WinnerNameKey.WithValue(player.Name)));
 
                 players.Remove(player.Token, out _);
                 player = player with { WinningTime = DateTime.Now - GameStartedOn };
