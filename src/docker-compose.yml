@@ -2,14 +2,13 @@ version: '3.4'
 
 services:
   mars.web:
+    container_name: marsweb
     image: ${DOCKER_REGISTRY-}marsweb
     build:
       context: .
       dockerfile: Mars.Web/Dockerfile
     environment:
       - SeqServer=http://seq
-    networks:
-      - jaegernet
 
   seq:
     container_name: seq
@@ -34,6 +33,30 @@ services:
       - jaegernet
     depends_on:
       - mars.web
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus:/etc/prometheus/
+      - prom_data:/prometheus
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    volumes:
+      - ./grafana:/var/lib/grafana
+
+volumes:
+  prom_data:
 
 networks:
   jaegernet:

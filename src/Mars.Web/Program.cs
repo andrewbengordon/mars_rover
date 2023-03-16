@@ -5,11 +5,13 @@ using Microsoft.OpenApi.Models;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Exceptions;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +59,8 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddSingleton<MultiGameHoster>();
 builder.Services.AddSingleton<IMapProvider, FileSystemMapProvider>();
 
+builder.Services.AddSingleton<MetricHelper>();
+
 builder.Services.AddHostedService<CleanupGameService>();
 
 builder.Services.AddRateLimiter(options =>
@@ -81,6 +85,20 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+// Custom Metrics to count requests for each endpoint and the method
+var counter = Metrics.CreateCounter("api_path_counter_total", "Counts requests to API endpoints", new CounterConfiguration
+{
+    LabelNames = new[] { "method", "endpoint" }
+});
+app.Use((context, next) => {
+    counter.WithLabels(context.Request.Method, context.Request.Path).Inc();
+    return next();
+});
+// Use the Prometheus middleware
+app.UseMetricServer();
+app.UseHttpMetrics();
+
 
 app.UseStaticFiles();
 

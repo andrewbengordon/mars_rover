@@ -5,8 +5,9 @@ namespace Mars.Web;
 public class GameManager
 {
     private readonly ILogger<Game> logger;
+    private readonly MetricHelper metricHelper;
 
-    public GameManager(List<Map> maps, ILogger<Game> logger)
+    public GameManager(List<Map> maps, ILogger<Game> logger, MetricHelper metricHelper)
     {
         CreatedOn = DateTime.Now;
         GameStartOptions = new GameCreationOptions
@@ -19,6 +20,7 @@ public class GameManager
         };
         this.Maps = maps;
         this.logger = logger;
+        this.metricHelper = metricHelper;
         StartNewGame(GameStartOptions);
     }
     public IReadOnlyList<Map> Maps { get; }
@@ -63,7 +65,7 @@ public class GameManager
         NewGameStarted?.Invoke(this, new EventArgs());
 
         logger.LogInformation("Starting new game with {options}", startOptions);
-        Game = new Game(startOptions, logger);
+        Game = new Game(startOptions, logger, metricHelper);
         GameStateChanged?.Invoke(this, EventArgs.Empty);
 
         //subscribe to new event

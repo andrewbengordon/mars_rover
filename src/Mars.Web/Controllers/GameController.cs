@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Prometheus;
+using System.Diagnostics;
 
 namespace Mars.Web.Controllers;
 
@@ -14,12 +15,14 @@ public class GameController : ControllerBase
     ConcurrentDictionary<string, GameManager> games;
     private readonly ConcurrentDictionary<string, string> tokenMap;
     private readonly ILogger<GameController> logger;
+    private readonly MetricHelper metricHelper;
 
-    public GameController(MultiGameHoster multiGameHoster, ILogger<GameController> logger)
+    public GameController(MultiGameHoster multiGameHoster, ILogger<GameController> logger, MetricHelper metricHelper)
     {
         this.games = multiGameHoster.Games;
         this.tokenMap = multiGameHoster.TokenMap;
         this.logger = logger;
+        this.metricHelper = metricHelper;
     }
 
     /// <summary>
@@ -44,6 +47,7 @@ public class GameController : ControllerBase
                     tokenMap.TryAdd(joinResult.Token.Value, gameId);
                     logger.LogWarning("Player {name} joined game {gameId}", name, gameId);
                 }
+                metricHelper.CumulativePlayerCounter.WithLabels(name, gameId).Inc();
                 return new JoinResponse
                 {
                     Token = joinResult.Token.Value,

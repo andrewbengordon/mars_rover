@@ -2,11 +2,12 @@
 
 public class MultiGameHoster
 {
-    public MultiGameHoster(IMapProvider mapProvider, ILoggerFactory logFactory)
+    public MultiGameHoster(IMapProvider mapProvider, ILoggerFactory logFactory, MetricHelper metricHelper)
     {
         ParsedMaps = new List<Map>(mapProvider.LoadMaps());
         this.logger = logFactory.CreateLogger<MultiGameHoster>();
         this.gameLogger = logFactory.CreateLogger<Game>();
+        this.metricHelper = metricHelper;
     }
 
     public void RaiseOldGamesPurged() => OldGamesPurged?.Invoke(this, EventArgs.Empty);
@@ -19,13 +20,14 @@ public class MultiGameHoster
     private readonly object lockObject = new();
     private readonly ILogger<MultiGameHoster> logger;
     private readonly ILogger<Game> gameLogger;
+    private readonly MetricHelper metricHelper;
 
     public string MakeNewGame()
     {
         lock (lockObject)
         {
             var gameId = nextGame;
-            Games.TryAdd(gameId, new GameManager(ParsedMaps, gameLogger));
+            Games.TryAdd(gameId, new GameManager(ParsedMaps, gameLogger, metricHelper));
 
             nextGame = IncrementGameId(nextGame);
             logger.LogInformation($"New Game Created: {gameId}");

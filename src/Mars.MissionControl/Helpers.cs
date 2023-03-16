@@ -45,7 +45,7 @@ public static class Helpers
         {
             MapWithTargets = new MapWithTargets(map, targets)
         };
-        var game = new Game(startOptions, logger);
+        var game = new Game(startOptions, logger, null);
         return game;
     }
 

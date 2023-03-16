@@ -23,4 +23,6 @@ public record Player
     public Location IngenuityLocation { get; init; }
     public int IngenuityBatteryLevel { get; init; }
     public Orientation Orientation { get; init; }
+
+    public bool HasMoved { get; set; } = false;
 }

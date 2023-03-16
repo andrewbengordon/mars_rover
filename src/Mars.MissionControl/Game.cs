@@ -1,10 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
+using Prometheus;
 using System.Collections.ObjectModel;
 
 namespace Mars.MissionControl;
 public class Game : IDisposable
 {
-    public Game(GameCreationOptions startOptions, ILogger<Game> logger)
+    public Game(GameCreationOptions startOptions, ILogger<Game> logger, MetricHelper metricHelper)
     {
         if (!(startOptions.MapWithTargets.Targets?.Any() ?? false))
         {
@@ -20,6 +21,7 @@ public class Game : IDisposable
         StartingBatteryLevel = startOptions.StartingBatteryLevel;
         IngenuityStartingBatteryLevel = Board.Width * 2 + Board.Height * 2;
         this.logger = logger;
+        this.metricHelper = metricHelper;
     }
 
     public int MapNumber => Board.MapNumber;
@@ -31,6 +33,7 @@ public class Game : IDisposable
     public int IngenuityStartingBatteryLevel { get; }
 
     private readonly ILogger<Game> logger;
+    private readonly MetricHelper metricHelper;
 
     public Map Map { get; private set; }
     private ConcurrentDictionary<PlayerToken, Player> players = new();
@@ -215,10 +218,16 @@ public class Game : IDisposable
 
         if (direction == Direction.Right || direction == Direction.Left)
         {
+            if (!player.HasMoved)
+            {
+                metricHelper.PlayersMovedCounter.Inc();
+            }
+            metricHelper.MoveTypeCounter.WithLabels("turn").Inc();
             player = player with
             {
                 BatteryLevel = player.BatteryLevel - 1,
-                Orientation = player.Orientation.Turn(direction)
+                Orientation = player.Orientation.Turn(direction),
+                HasMoved = true
             };
             message = GameMessages.TurnedOK;
         }
@@ -244,15 +253,22 @@ public class Game : IDisposable
                 var newBatteryLevel = player.BatteryLevel - Board[desiredLocation].Difficulty.Value;
                 if (newBatteryLevel >= 0)
                 {
+                    if (!player.HasMoved)
+                    {
+                        metricHelper.PlayersMovedCounter.Inc();
+                    }
+                    metricHelper.MoveTypeCounter.WithLabels("straight").Inc();
                     player = player with
                     {
                         BatteryLevel = newBatteryLevel,
-                        PerseveranceLocation = desiredLocation
+                        PerseveranceLocation = desiredLocation,
+                        HasMoved = true
                     };
                     message = GameMessages.MovedOK;
                 }
                 else
                 {
+                    metricHelper.RoverBatteryDepletedCounter.Inc();
                     message = GameMessages.InsufficientBattery;
                 }
             }
@@ -270,6 +286,8 @@ public class Game : IDisposable
             if (hasVisitedAllTargets(player))
             {
                 logger.LogInformation("Player {playerName} has won!", player.Name);
+                metricHelper.WinnerCounter.Inc(1, Exemplar.From(MetricHelper.WinnerNameKey.WithValue(player.Name)));
+
                 players.Remove(player.Token, out _);
                 player = player with { WinningTime = DateTime.Now - GameStartedOn };
                 winners.Enqueue(player);
